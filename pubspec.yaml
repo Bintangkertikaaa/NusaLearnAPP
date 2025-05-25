@@ -1,0 +1,30 @@
+name: nusa_learn_app
+description: "Aplikasi pembelajaran budaya nusantara untuk anak-anak"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.1.5 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/icons/
+    - assets/images/
+    - assets/fonts/
+
+  fonts:
+    - family: Jomhuria
+      fonts:
+        - asset: assets/fonts/Jomhuria-Regular.ttf
