@@ -1,34 +1,59 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'providers/user_provider.dart';
 import 'screens/splash_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/friend_requests_screen.dart';
 import 'screens/minigames_screen.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'firebase_options.dart';
+import 'screens/users_screen.dart';
 
-void main() {
-  runApp(const NusaLearnApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Inisialisasi Firebase
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  // Mengatur pengaturan Firestore
+  await FirebaseFirestore.instance.enablePersistence();
+  FirebaseFirestore.instance.settings = const Settings(
+    persistenceEnabled: true, // Mengaktifkan caching lokal
+    cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED, // Cache tidak terbatas
+  );
+
+  runApp(const MyApp());
 }
 
-class NusaLearnApp extends StatelessWidget {
-  const NusaLearnApp({super.key});
+class MyApp extends StatelessWidget {
+  const MyApp({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'NusaLearn',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        primarySwatch: Colors.deepOrange,
-        fontFamily: 'Roboto',
+    return ChangeNotifierProvider(
+      create: (_) => UserProvider(),
+      child: MaterialApp(
+        title: 'NusaLearn',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          primarySwatch: Colors.deepOrange,
+          fontFamily: 'Roboto',
+          scaffoldBackgroundColor: const Color(0xFFFFF3E0),
+        ),
+        initialRoute: '/',
+        routes: {
+          '/': (context) => SplashScreen(),
+          '/login': (context) => LoginScreen(),
+          '/home': (context) => HomeScreen(),
+          '/friend-requests': (context) => const FriendRequestsScreen(),
+          '/minigames': (context) => const MinigamesScreen(),
+          '/users': (context) => UsersScreen(),
+        },
       ),
-      initialRoute: '/',
-      routes: {
-        '/': (context) => SplashScreen(),
-        '/login': (context) => LoginScreen(),
-        '/home': (context) => HomeScreen(),
-        '/friend-requests': (context) => const FriendRequestsScreen(),
-        '/minigames': (context) => const MinigamesScreen(),
-      },
     );
   }
 }

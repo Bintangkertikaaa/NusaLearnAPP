@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../services/learning_service.dart';
+import '../providers/user_provider.dart';
 
 class MinigamesScreen extends StatefulWidget {
   const MinigamesScreen({Key? key}) : super(key: key);
@@ -16,9 +19,11 @@ class _MinigamesScreenState extends State<MinigamesScreen> {
     'senjata': {},
   };
 
+  final LearningService _learningService = LearningService();
+
   bool isLevelUnlocked(String category, int level) {
     if (level == 1) return true;
-    
+
     // Check if previous level is completed
     final previousLevelScore = _levelScores[category]?[level - 1] ?? 0;
     return previousLevelScore > 0;
@@ -28,17 +33,28 @@ class _MinigamesScreenState extends State<MinigamesScreen> {
     return _levelScores[category]?[level] ?? 0;
   }
 
-  void updateLevelScore(String category, int level, int score) {
+  Future<void> updateLevelScore(String category, int level, int score) async {
     if (_levelScores[category] == null) {
       _levelScores[category] = {};
     }
-    
+
     // Only update if new score is higher
     final currentScore = _levelScores[category]?[level] ?? 0;
     if (score > currentScore) {
       setState(() {
         _levelScores[category]![level] = score;
       });
+
+      // Update learning progress
+      try {
+        final userId =
+            Provider.of<UserProvider>(context, listen: false).user?.id;
+        if (userId != null) {
+          await _learningService.completeGame(userId, score);
+        }
+      } catch (e) {
+        print('Error updating game progress: $e');
+      }
     }
   }
 
@@ -78,12 +94,13 @@ class _MinigamesScreenState extends State<MinigamesScreen> {
               ),
             ),
             const SizedBox(height: 24),
-            
+
             // Word Puzzle Game Card
             _buildGameCard(
               context,
               title: 'Word Puzzle',
-              description: 'Tebak kata budaya Indonesia dari petunjuk yang diberikan!',
+              description:
+                  'Tebak kata budaya Indonesia dari petunjuk yang diberikan!',
               icon: Icons.quiz,
               color: Colors.purple,
               onTap: () {
@@ -167,7 +184,8 @@ class _MinigamesScreenState extends State<MinigamesScreen> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: const BoxDecoration(
-                border: Border(bottom: BorderSide(color: Colors.grey, width: 0.2)),
+                border:
+                    Border(bottom: BorderSide(color: Colors.grey, width: 0.2)),
               ),
               child: Row(
                 children: [
@@ -251,7 +269,8 @@ class _MinigamesScreenState extends State<MinigamesScreen> {
     );
   }
 
-  void _showLevelsDialog(BuildContext context, String category, String categoryTitle, Color color) {
+  void _showLevelsDialog(BuildContext context, String category,
+      String categoryTitle, Color color) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -267,7 +286,8 @@ class _MinigamesScreenState extends State<MinigamesScreen> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: const BoxDecoration(
-                border: Border(bottom: BorderSide(color: Colors.grey, width: 0.2)),
+                border:
+                    Border(bottom: BorderSide(color: Colors.grey, width: 0.2)),
               ),
               child: Row(
                 children: [
@@ -294,34 +314,39 @@ class _MinigamesScreenState extends State<MinigamesScreen> {
                   final level = index + 1;
                   final isUnlocked = isLevelUnlocked(category, level);
                   final score = getLevelScore(category, level);
-                  
+
                   return Container(
                     margin: const EdgeInsets.only(bottom: 16),
                     child: Material(
                       color: Colors.transparent,
                       child: InkWell(
-                        onTap: isUnlocked ? () async {
-                          Navigator.pop(context);
-                          final result = await Navigator.push<int>(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => WordPuzzleScreen(
-                                category: category,
-                                level: level,
-                                onLevelComplete: (score) {
-                                  updateLevelScore(category, level, score);
-                                },
-                              ),
-                            ),
-                          );
-                          if (result != null) {
-                            updateLevelScore(category, level, result);
-                          }
-                        } : null,
+                        onTap: isUnlocked
+                            ? () async {
+                                Navigator.pop(context);
+                                final result = await Navigator.push<int>(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => WordPuzzleScreen(
+                                      category: category,
+                                      level: level,
+                                      onLevelComplete: (score) {
+                                        updateLevelScore(
+                                            category, level, score);
+                                      },
+                                    ),
+                                  ),
+                                );
+                                if (result != null) {
+                                  updateLevelScore(category, level, result);
+                                }
+                              }
+                            : null,
                         child: Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: isUnlocked ? color.withOpacity(0.1) : Colors.grey[200],
+                            color: isUnlocked
+                                ? color.withOpacity(0.1)
+                                : Colors.grey[200],
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
                               color: isUnlocked ? color : Colors.grey,
@@ -358,13 +383,17 @@ class _MinigamesScreenState extends State<MinigamesScreen> {
                                       style: TextStyle(
                                         fontSize: 18,
                                         fontWeight: FontWeight.bold,
-                                        color: isUnlocked ? Colors.black : Colors.grey,
+                                        color: isUnlocked
+                                            ? Colors.black
+                                            : Colors.grey,
                                       ),
                                     ),
                                     Text(
                                       '5 Soal',
                                       style: TextStyle(
-                                        color: isUnlocked ? Colors.black54 : Colors.grey,
+                                        color: isUnlocked
+                                            ? Colors.black54
+                                            : Colors.grey,
                                       ),
                                     ),
                                   ],
@@ -376,7 +405,8 @@ class _MinigamesScreenState extends State<MinigamesScreen> {
                                 Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    const Icon(Icons.star, color: Colors.amber, size: 20),
+                                    const Icon(Icons.star,
+                                        color: Colors.amber, size: 20),
                                     const SizedBox(width: 4),
                                     Text(
                                       '$score/50',
@@ -408,7 +438,7 @@ class WordPuzzleScreen extends StatefulWidget {
   final String category;
   final int level;
   final Function(int score)? onLevelComplete;
-  
+
   const WordPuzzleScreen({
     Key? key,
     required this.category,
@@ -908,7 +938,7 @@ class _WordPuzzleScreenState extends State<WordPuzzleScreen> {
     if (widget.onLevelComplete != null) {
       widget.onLevelComplete!(_score);
     }
-    
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -1077,13 +1107,16 @@ class _WordPuzzleScreenState extends State<WordPuzzleScreen> {
                   margin: const EdgeInsets.symmetric(horizontal: 4),
                   decoration: BoxDecoration(
                     border: Border.all(
-                      color: _isCorrect ? Colors.green : const Color(0xFFFF5722),
+                      color:
+                          _isCorrect ? Colors.green : const Color(0xFFFF5722),
                     ),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Center(
                     child: Text(
-                      index < _selectedLetters.length ? _selectedLetters[index] : '',
+                      index < _selectedLetters.length
+                          ? _selectedLetters[index]
+                          : '',
                       style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
@@ -1157,4 +1190,4 @@ class _WordPuzzleScreenState extends State<WordPuzzleScreen> {
       ),
     );
   }
-} 
+}

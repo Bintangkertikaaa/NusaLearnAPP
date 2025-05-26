@@ -1,271 +1,330 @@
 import 'package:flutter/material.dart';
-import 'social_screen.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../models/friend_request_model.dart';
 
-class FriendRequest {
-  final String id;
-  final String name;
-  final String school;
-  final String time;
-  final String initials;
-  bool isAccepted;
-  bool isPast;
-
-  FriendRequest({
-    required this.id,
-    required this.name,
-    required this.school,
-    required this.time,
-    required this.initials,
-    this.isAccepted = false,
-    this.isPast = false,
-  });
-}
-
-class FriendRequestsScreen extends StatefulWidget {
+class FriendRequestsScreen extends StatelessWidget {
   const FriendRequestsScreen({Key? key}) : super(key: key);
 
-  @override
-  State<FriendRequestsScreen> createState() => _FriendRequestsScreenState();
-}
+  Future<void> _handleFriendRequest(String requestId, String status) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('friend_requests')
+          .doc(requestId)
+          .update({'status': status});
 
-class _FriendRequestsScreenState extends State<FriendRequestsScreen> {
-  final List<FriendRequest> _todayRequests = [];
-  final List<FriendRequest> _pastRequests = [];
-
-  @override
-  void initState() {
-    super.initState();
-    // Data permintaan hari ini
-    _todayRequests.addAll([
-      FriendRequest(
-        id: '1',
-        name: 'Isyana Macika',
-        school: 'SMA N 1 Tangerang',
-        time: '20:00',
-        initials: 'IM',
-      ),
-      FriendRequest(
-        id: '2',
-        name: 'Bintang Kartika',
-        school: 'SD 1 Magelang',
-        time: '11:50',
-        initials: 'BK',
-      ),
-      FriendRequest(
-        id: '3',
-        name: 'Victor D',
-        school: 'SD 5 Jakarta',
-        time: '10:55',
-        initials: 'VD',
-      ),
-    ]);
-
-    // Data permintaan 5 hari lalu
-    _pastRequests.add(
-      FriendRequest(
-        id: '4',
-        name: 'Jyotisa',
-        school: 'SMF 5 Bandung',
-        time: '15:30',
-        initials: 'J',
-        isPast: true,
-      ),
-    );
-  }
-
-  void _acceptRequest(FriendRequest request) {
-    setState(() {
-      // Hapus dari daftar permintaan hari ini
-      _todayRequests.remove(request);
-      // Ubah status dan tambahkan ke daftar yang sudah diterima
-      request.isPast = true;
-      _pastRequests.add(request);
-    });
-  }
-
-  Widget _buildRequestItem(FriendRequest request) {
-    return Container(
-      color: Colors.white,
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
-              children: [
-                // Avatar
-                CircleAvatar(
-                  radius: 25,
-                  backgroundColor: const Color(0xFFFFB74D),
-                  child: Text(
-                    request.initials,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                // Info
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        request.name,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w500,
-                          fontSize: 16,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        request.school,
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                // Time
-                Text(
-                  request.time,
-                  style: TextStyle(
-                    color: Colors.grey[600],
-                    fontSize: 12,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                // Action buttons
-                if (!request.isPast) ...[
-                  ElevatedButton(
-                    onPressed: () => _acceptRequest(request),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green[100],
-                      foregroundColor: Colors.green[700],
-                      elevation: 0,
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-        ),
-                    child: const Text('Terima'),
-                  ),
-                  const SizedBox(width: 8),
-                  ElevatedButton(
-                    onPressed: () {
-    setState(() {
-                        _todayRequests.remove(request);
-                      });
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.grey[300],
-                      foregroundColor: Colors.grey[700],
-                      elevation: 0,
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-        ),
-                    child: const Text('Tolak'),
-                  ),
-                ] else ...[
-                  ElevatedButton.icon(
-                    onPressed: () {},
-                    icon: const Icon(Icons.person_add),
-                    label: const Text('Berteman'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green[100],
-                      foregroundColor: Colors.green[700],
-                      elevation: 0,
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const Divider(height: 1),
-        ],
-      ),
-    );
+      if (status == 'accepted') {
+        // TODO: Add both users to each other's friends list
+      }
+    } catch (e) {
+      rethrow;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[100],
-      appBar: AppBar(
-        backgroundColor: const Color(0xFFFF5722),
-        title: const Text(
-          'Kontak Masuk',
-          style: TextStyle(color: Colors.white),
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) {
+      return const Scaffold(
+        body: Center(
+          child: Text('Silakan login terlebih dahulu'),
         ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () {
-            Navigator.pushReplacementNamed(context, '/home');
-          },
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications, color: Colors.white),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const SocialScreen(initialTabIndex: 1),
-                ),
-              );
-            },
-          ),
-        ],
-      ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Permintaan Pertemanan',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${_todayRequests.length} permintaan pertemanan baru',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[600],
-                  ),
-                ),
-              ],
+      );
+    }
+
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        backgroundColor: const Color(0xFFFFF3E0),
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          title: const Text(
+            'Kontak Masuk',
+            style: TextStyle(
+              color: Colors.black87,
+              fontWeight: FontWeight.bold,
             ),
           ),
-          Expanded(
-            child: ListView(
-              children: [
-                ..._todayRequests.map((request) => _buildRequestItem(request)),
-                if (_pastRequests.isNotEmpty) ...[
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Text(
-                      '5 hari lalu',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[700],
-                        fontWeight: FontWeight.w500,
-                      ),
+          bottom: const TabBar(
+            labelColor: Color(0xFFFF5722),
+            unselectedLabelColor: Colors.grey,
+            indicatorColor: Color(0xFFFF5722),
+            tabs: [
+              Tab(text: 'Diterima'),
+              Tab(text: 'Menunggu'),
+            ],
+          ),
+        ),
+        body: TabBarView(
+          children: [
+            // Tab Permintaan Diterima
+            StreamBuilder(
+              stream: FirebaseFirestore.instance
+                  .collection('friend_requests')
+                  .where('receiverId', isEqualTo: currentUser.uid)
+                  .where('status', isEqualTo: 'accepted')
+                  .snapshots(),
+              builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {
+                if (snapshot.hasError) {
+                  return Center(child: Text('Error: ${snapshot.error}'));
+                }
+
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.people_outline,
+                          size: 64,
+                          color: Colors.grey[400],
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Belum ada teman',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  ..._pastRequests.map((request) => _buildRequestItem(request)),
-                ],
-              ],
+                  );
+                }
+
+                return ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: snapshot.data!.docs.length,
+                  itemBuilder: (context, index) {
+                    var request = snapshot.data!.docs[index];
+                    return FutureBuilder(
+                      future: FirebaseFirestore.instance
+                          .collection('users')
+                          .doc(request['senderId'])
+                          .get(),
+                      builder: (context,
+                          AsyncSnapshot<DocumentSnapshot> userSnapshot) {
+                        if (!userSnapshot.hasData) {
+                          return const SizedBox();
+                        }
+
+                        var userData =
+                            userSnapshot.data!.data() as Map<String, dynamic>;
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.05),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: ListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
+                            leading: CircleAvatar(
+                              radius: 24,
+                              backgroundColor: const Color(0xFFFFB74D),
+                              child: Text(
+                                userData['name']?[0]?.toUpperCase() ?? '?',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 18,
+                                ),
+                              ),
+                            ),
+                            title: Text(
+                              userData['name'] ?? 'Nama tidak tersedia',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                            subtitle: Text(
+                              userData['school'] ?? 'Sekolah tidak tersedia',
+                              style: TextStyle(
+                                color: Colors.grey[600],
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                );
+              },
             ),
-          ),
-        ],
+            // Tab Permintaan Menunggu
+            StreamBuilder(
+              stream: FirebaseFirestore.instance
+                  .collection('friend_requests')
+                  .where('receiverId', isEqualTo: currentUser.uid)
+                  .where('status', isEqualTo: 'pending')
+                  .snapshots(),
+              builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {
+                if (snapshot.hasError) {
+                  return Center(child: Text('Error: ${snapshot.error}'));
+                }
+
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.mail_outline,
+                          size: 64,
+                          color: Colors.grey[400],
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Tidak ada permintaan pertemanan baru',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                return ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: snapshot.data!.docs.length,
+                  itemBuilder: (context, index) {
+                    var request = snapshot.data!.docs[index];
+                    return FutureBuilder(
+                      future: FirebaseFirestore.instance
+                          .collection('users')
+                          .doc(request['senderId'])
+                          .get(),
+                      builder: (context,
+                          AsyncSnapshot<DocumentSnapshot> userSnapshot) {
+                        if (!userSnapshot.hasData) {
+                          return const SizedBox();
+                        }
+
+                        var userData =
+                            userSnapshot.data!.data() as Map<String, dynamic>;
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.05),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: ListTile(
+                            contentPadding: const EdgeInsets.all(16),
+                            leading: CircleAvatar(
+                              radius: 24,
+                              backgroundColor: const Color(0xFFFFB74D),
+                              child: Text(
+                                userData['name']?[0]?.toUpperCase() ?? '?',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 18,
+                                ),
+                              ),
+                            ),
+                            title: Text(
+                              userData['name'] ?? 'Nama tidak tersedia',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const SizedBox(height: 4),
+                                Text(
+                                  userData['school'] ??
+                                      'Sekolah tidak tersedia',
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: ElevatedButton(
+                                        onPressed: () => _handleFriendRequest(
+                                          request.id,
+                                          'accepted',
+                                        ),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor:
+                                              const Color(0xFFFF5722),
+                                          foregroundColor: Colors.white,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                          ),
+                                        ),
+                                        child: const Text('Terima'),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: OutlinedButton(
+                                        onPressed: () => _handleFriendRequest(
+                                          request.id,
+                                          'rejected',
+                                        ),
+                                        style: OutlinedButton.styleFrom(
+                                          foregroundColor: Colors.grey[700],
+                                          side: BorderSide(
+                                            color: Colors.grey[300]!,
+                                          ),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                          ),
+                                        ),
+                                        child: const Text('Tolak'),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }

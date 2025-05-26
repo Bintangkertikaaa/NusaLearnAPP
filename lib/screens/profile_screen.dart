@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/user_provider.dart';
 import 'settings_screen.dart';
+import '../services/learning_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -9,40 +12,13 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  bool _showAllFriends = false;
-
-  final List<Map<String, String>> _friends = [
-    {
-      'initial': 'J',
-      'name': 'Jyotisa',
-      'rank': '#1',
-    },
-    {
-      'initial': 'B',
-      'name': 'Bintang',
-      'rank': '#2',
-    },
-    {
-      'initial': 'I',
-      'name': 'Isyana Macika',
-      'rank': '#3',
-    },
-    {
-      'initial': 'V',
-      'name': 'Victor D',
-      'rank': '#4',
-    },
-  ];
-
-  List<Map<String, String>> get displayedFriends {
-    if (_showAllFriends) {
-      return _friends;
-    }
-    return _friends.take(2).toList();
-  }
+  final learningService = LearningService();
 
   @override
   Widget build(BuildContext context) {
+    final userProvider = Provider.of<UserProvider>(context);
+    final user = userProvider.user;
+
     return Scaffold(
       backgroundColor: const Color(0xFFFFF3E0),
       body: SafeArea(
@@ -52,9 +28,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
               physics: const BouncingScrollPhysics(),
               child: Column(
                 children: [
-                  _buildProfileCard(),
+                  _buildProfileCard(user),
                   const SizedBox(height: 16),
-                  _buildFriendRankings(),
+                  _buildFriendList(),
                   const SizedBox(height: 24),
                 ],
               ),
@@ -84,13 +60,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildProfileCard() {
+  Widget _buildProfileCard(user) {
+    if (user == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
     return Container(
-      margin: const EdgeInsets.fromLTRB(16.0, 20.0, 16.0, 8.0),
-      padding: const EdgeInsets.only(top: 24.0, left: 16.0, right: 16.0, bottom: 20.0),
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16.0),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.1),
@@ -101,90 +81,53 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       child: Column(
         children: [
-          Row(
-            children: [
-              Stack(
-                children: [
-                  CircleAvatar(
-                    radius: 30,
-                    backgroundColor: const Color(0xFFFFAB40), // Brighter orange for avatar
-                    child: const Text(
-                      'T',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    right: 0,
-                    bottom: 0,
-                    child: Container(
-                      padding: const EdgeInsets.all(2),
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFFFD54F), // Yellow ranking badge
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Text(
-                          '#5',  // Changed from checkmark to ranking number
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+          CircleAvatar(
+            radius: 50,
+            backgroundColor: const Color(0xFFFFB74D),
+            child: Text(
+              user.name[0].toUpperCase(),
+              style: const TextStyle(
+                fontSize: 32,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Text(
-                      'Tasya',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      'SD Nusa Bangsa',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+            ),
           ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 16),
+          Text(
+            user.name,
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            user.school,
+            style: const TextStyle(
+              fontSize: 16,
+              color: Colors.grey,
+            ),
+          ),
+          const SizedBox(height: 16),
           Container(
-            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFFFFF8E1), // Very light yellow
-              borderRadius: BorderRadius.circular(16),
+              color: const Color(0xFFFFF3E0),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: const Color(0xFFFFB74D),
+                width: 2,
+              ),
             ),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildStatItem('856', 'Poin Total', const Color(0xFF8BC34A)), // Green
+                _buildStatItem('Level', user.level),
                 _buildDivider(),
-                _buildStatItem('pecinta Budaya', 'Level', const Color(0xFFFF9800)), // Orange
+                _buildStatItem('Poin', '${user.points}'),
                 _buildDivider(),
-                _buildStatItem('3', 'Penghargaan', const Color(0xFF9C27B0)), // Purple
+                _buildStatItem('Pencapaian', '${user.awards}'),
               ],
             ),
           ),
@@ -195,39 +138,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildDivider() {
     return Container(
-      height: 40,
+      height: 24,
       width: 1,
-      color: Colors.grey.withOpacity(0.2),
+      color: const Color(0xFFFFB74D),
     );
   }
 
-  Widget _buildStatItem(String value, String label, Color color) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: Column(
-        children: [
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
+  Widget _buildStatItem(String label, String value) {
+    return Column(
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            color: Colors.grey,
           ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 12,
-              color: Colors.grey,
-            ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFFFF5722),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
-  Widget _buildFriendRankings() {
+  Widget _buildFriendList() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16.0),
       padding: const EdgeInsets.all(16.0),
@@ -243,98 +183,75 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ],
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                'Peringkat Teman',
+                'Teman',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              if (!_showAllFriends)
-                TextButton(
-                  onPressed: () {
-                    setState(() {
-                      _showAllFriends = true;
-                    });
-                  },
-                  style: TextButton.styleFrom(
-                    minimumSize: Size.zero,
-                    padding: EdgeInsets.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  child: const Text(
-                    'Lihat semua',
-                    style: TextStyle(
-                      color: Color(0xFFFF7043),
-                      fontSize: 12,
-                    ),
+              TextButton(
+                onPressed: () {
+                  // Navigate to friend list screen
+                },
+                child: const Text(
+                  'Lihat Semua',
+                  style: TextStyle(
+                    color: Color(0xFFFF7043),
+                    fontSize: 12,
                   ),
                 ),
+              ),
             ],
           ),
           const SizedBox(height: 16),
-          ...displayedFriends.map((friend) => Column(
+          Row(
             children: [
-              _buildFriendRankingItem(
-                friend['initial']!,
-                friend['name']!,
-                friend['rank']!,
-                const Color(0xFFFFB74D),
-              ),
-              if (friend != displayedFriends.last)
-                const Divider(height: 24),
+              _buildFriendItem('J', 'Jyotisa'),
+              const SizedBox(width: 16),
+              _buildFriendItem('B', 'Bintang'),
+              const SizedBox(width: 16),
+              _buildFriendItem('I', 'Isyana'),
             ],
-          )).toList(),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildFriendRankingItem(String initial, String name, String rank, Color avatarColor) {
-    return Row(
-      children: [
-        CircleAvatar(
-          radius: 24,
-          backgroundColor: avatarColor,
-          child: Text(
-            initial,
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
+  Widget _buildFriendItem(String initial, String name) {
+    return Expanded(
+      child: Column(
+        children: [
+          CircleAvatar(
+            radius: 24,
+            backgroundColor: const Color(0xFFFFB74D),
+            child: Text(
+              initial,
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
             ),
           ),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Text(
+          const SizedBox(height: 8),
+          Text(
             name,
             style: const TextStyle(
-              fontSize: 16,
+              fontSize: 12,
               fontWeight: FontWeight.w500,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-        ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: const Color(0xFFFFECB3), // Light yellow for rank badge
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Text(
-            rank,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: Colors.black54,
-            ),
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
-} 
+}

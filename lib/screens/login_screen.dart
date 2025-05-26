@@ -1,67 +1,171 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../providers/user_provider.dart';
+import '../models/user_model.dart';
 import 'home_screen.dart';
 import 'forgot_password_screen.dart';
 import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
+  const LoginScreen({Key? key}) : super(key: key);
+
   @override
   _LoginScreenState createState() => _LoginScreenState();
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final TextEditingController usernameController = TextEditingController();
+  final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
   bool _isLoading = false;
-  String? _usernameError;
+  String? _emailError;
   String? _passwordError;
   bool _obscurePassword = true;
   bool _rememberMe = false;
 
-  void _validateAndLogin() {
-    // Reset error messages
+  Future<void> _validateAndLogin() async {
     setState(() {
-      _usernameError = null;
+      _emailError = null;
       _passwordError = null;
+      _isLoading = true;
     });
 
-    final username = usernameController.text.trim();
-    final password = passwordController.text.trim();
-    bool hasError = false;
+    try {
+      final email = emailController.text.trim();
+      final password = passwordController.text.trim();
+      bool hasError = false;
 
-    if (username.isEmpty) {
-      setState(() {
-        _usernameError = 'Nama pengguna tidak boleh kosong';
-        hasError = true;
-      });
-    }
+      if (email.isEmpty) {
+        setState(() {
+          _emailError = 'Email tidak boleh kosong';
+          hasError = true;
+        });
+      } else if (!email.contains('@')) {
+        setState(() {
+          _emailError = 'Email tidak valid';
+          hasError = true;
+        });
+      }
 
-    if (password.isEmpty) {
-      setState(() {
-        _passwordError = 'Kata sandi tidak boleh kosong';
-        hasError = true;
-      });
-    } else if (password.length < 6) {
-      setState(() {
-        _passwordError = 'Kata sandi minimal 6 karakter';
-        hasError = true;
-      });
-    }
+      if (password.isEmpty) {
+        setState(() {
+          _passwordError = 'Kata sandi tidak boleh kosong';
+          hasError = true;
+        });
+      } else if (password.length < 6) {
+        setState(() {
+          _passwordError = 'Kata sandi minimal 6 karakter';
+          hasError = true;
+        });
+      }
 
-    if (!hasError) {
-      // TODO: Implement actual login logic here
-      // For demo purposes, we'll use a hardcoded credential
-      if (username == 'admin' && password == 'admin123') {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => HomeScreen()),
+      if (!hasError) {
+        // Login dengan Firebase
+        final userCredential = await _auth.signInWithEmailAndPassword(
+          email: email,
+          password: password,
         );
+
+        if (userCredential.user != null) {
+          // Ambil data user dari Firestore
+          final userDoc = await _firestore
+              .collection('users')
+              .doc(userCredential.user!.uid)
+              .get();
+
+          if (userDoc.exists) {
+            final userData = userDoc.data()!;
+            // Buat UserModel dari data Firestore menggunakan factory method
+            final user =
+                UserModel.fromFirestore(userData, userCredential.user!.uid);
+
+            // Set user ke provider
+            if (!mounted) return;
+            Provider.of<UserProvider>(context, listen: false).setUser(user);
+
+            // Navigasi ke home screen
+            if (!mounted) return;
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => HomeScreen()),
+            );
+          } else {
+            // Jika data user tidak ditemukan di Firestore, buat data default
+            final defaultUser = UserModel(
+              id: userCredential.user!.uid,
+              name: userCredential.user!.displayName ?? '',
+              email: userCredential.user!.email ?? '',
+              school: '',
+              level: 'Pemula',
+              points: 0,
+              awards: 0,
+            );
+
+            // Simpan data default ke Firestore
+            await _firestore
+                .collection('users')
+                .doc(userCredential.user!.uid)
+                .set(defaultUser.toFirestore());
+
+            // Set user ke provider
+            if (!mounted) return;
+            Provider.of<UserProvider>(context, listen: false)
+                .setUser(defaultUser);
+
+            // Navigasi ke home screen
+            if (!mounted) return;
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => HomeScreen()),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      String errorMessage = 'Terjadi kesalahan';
+
+      if (e is FirebaseAuthException) {
+        switch (e.code) {
+          case 'user-not-found':
+            errorMessage = 'Email tidak terdaftar';
+            break;
+          case 'wrong-password':
+            errorMessage = 'Kata sandi salah';
+            break;
+          case 'invalid-email':
+            errorMessage = 'Format email tidak valid';
+            break;
+          case 'user-disabled':
+            errorMessage = 'Akun telah dinonaktifkan';
+            break;
+          case 'network-request-failed':
+            errorMessage = 'Koneksi internet bermasalah';
+            break;
+          default:
+            errorMessage = 'Error: ${e.code} - ${e.message}';
+        }
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Nama pengguna atau kata sandi salah'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        errorMessage = 'Error: ${e.toString()}';
+      }
+
+      print('Login error: $errorMessage'); // Tambahkan log untuk debugging
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(errorMessage),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 5),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
       }
     }
   }
@@ -95,21 +199,22 @@ class _LoginScreenState extends State<LoginScreen> {
             const Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                'Nama Pengguna',
+                'Email',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
             ),
             const SizedBox(height: 6),
             TextField(
-              controller: usernameController,
+              controller: emailController,
+              keyboardType: TextInputType.emailAddress,
               decoration: InputDecoration(
-                hintText: 'Masukkan nama pengguna',
+                hintText: 'Masukkan email',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
                   borderSide: const BorderSide(color: Colors.orange),
                 ),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                errorText: _usernameError,
+                errorText: _emailError,
               ),
             ),
             const SizedBox(height: 16),
@@ -124,7 +229,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   onPressed: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => ForgotPasswordScreen()),
+                      MaterialPageRoute(
+                          builder: (context) => ForgotPasswordScreen()),
                     );
                   },
                   child: const Text(
@@ -191,33 +297,37 @@ class _LoginScreenState extends State<LoginScreen> {
                         width: 20,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Colors.white),
                         ),
                       )
                     : const Text(
                         'Masuk',
                         style: TextStyle(
-                          color: Colors.white,
                           fontSize: 16,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Text('Belum punya akun?'),
+                const Text('Belum punya akun? '),
                 TextButton(
                   onPressed: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => RegisterScreen()),
+                      MaterialPageRoute(builder: (context) => RegisterScreen()),
                     );
                   },
                   child: const Text(
-                    'Daftar di sini',
-                    style: TextStyle(color: Colors.deepOrange),
+                    'Daftar',
+                    style: TextStyle(
+                      color: Color(0xFFFF6D3D),
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ],
@@ -227,11 +337,4 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
-
-  @override
-  void dispose() {
-    usernameController.dispose();
-    passwordController.dispose();
-    super.dispose();
-  }
-} 
+}

@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
 import 'login_screen.dart';
 import 'home_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:provider/provider.dart';
+import '../providers/user_provider.dart';
+import '../models/user_model.dart';
+import '../models/learning_progress.dart';
 
 class RegisterScreen extends StatefulWidget {
   @override
@@ -12,8 +18,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController schoolController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
-  final TextEditingController confirmPasswordController = TextEditingController();
-  
+  final TextEditingController confirmPasswordController =
+      TextEditingController();
+
   String? _nameError;
   String? _emailError;
   String? _schoolError;
@@ -23,7 +30,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   bool _validateFields() {
     bool isValid = true;
-    
+
     // Reset all error messages
     setState(() {
       _nameError = null;
@@ -94,29 +101,98 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return isValid;
   }
 
-  void _handleRegister() {
+  void _handleRegister() async {
     if (_validateFields()) {
       setState(() {
         _isLoading = true;
       });
 
-      // Simulate registration process
-      Future.delayed(const Duration(seconds: 2), () {
-        setState(() {
-          _isLoading = false;
-        });
-        
-        // Show success message
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Pendaftaran berhasil! Silakan masuk.'),
-            backgroundColor: Colors.green,
-          ),
+      try {
+        // Create user in Firebase Auth
+        final userCredential =
+            await FirebaseAuth.instance.createUserWithEmailAndPassword(
+          email: emailController.text.trim(),
+          password: passwordController.text,
         );
 
-        // Navigate back to login screen
-        Navigator.pop(context);
-      });
+        if (userCredential.user != null) {
+          // Create UserModel
+          final newUser = UserModel(
+            id: userCredential.user!.uid,
+            name: nameController.text.trim(),
+            email: emailController.text.trim(),
+            school: schoolController.text.trim(),
+            level: 'Pemula',
+            points: 0,
+            awards: 0,
+          );
+
+          // Save user data to Firestore
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(userCredential.user!.uid)
+              .set(newUser.toFirestore());
+
+          // Create initial learning progress
+          final initialProgress = LearningProgress(
+            userId: userCredential.user!.uid,
+          );
+
+          // Save learning progress to Firestore
+          await FirebaseFirestore.instance
+              .collection('learning_progress')
+              .doc(userCredential.user!.uid)
+              .set(initialProgress.toFirestore());
+
+          if (!mounted) return;
+
+          // Show success message
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Pendaftaran berhasil! Silakan masuk.'),
+              backgroundColor: Colors.green,
+            ),
+          );
+
+          // Navigate back to login screen
+          Navigator.pop(context);
+        }
+      } catch (e) {
+        String errorMessage = 'Terjadi kesalahan saat mendaftar';
+
+        if (e is FirebaseAuthException) {
+          switch (e.code) {
+            case 'email-already-in-use':
+              errorMessage = 'Email sudah terdaftar';
+              break;
+            case 'invalid-email':
+              errorMessage = 'Format email tidak valid';
+              break;
+            case 'operation-not-allowed':
+              errorMessage =
+                  'Pendaftaran dengan email dan password tidak diizinkan';
+              break;
+            case 'weak-password':
+              errorMessage = 'Password terlalu lemah';
+              break;
+            default:
+              errorMessage = 'Error: ${e.message}';
+          }
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+          ),
+        );
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
+      }
     }
   }
 
@@ -260,7 +336,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         width: 20,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Colors.white),
                         ),
                       )
                     : const Text(
@@ -303,4 +380,4 @@ class _RegisterScreenState extends State<RegisterScreen> {
     confirmPasswordController.dispose();
     super.dispose();
   }
-} 
+}
