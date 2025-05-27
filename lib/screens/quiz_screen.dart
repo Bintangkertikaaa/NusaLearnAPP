@@ -338,19 +338,17 @@ class _QuizScreenState extends State<QuizScreen> {
         });
 
         // Update learning progress dan points
-        if (_score >= 3) {
-          // Minimum 60% benar
-          try {
-            final userId =
-                Provider.of<UserProvider>(context, listen: false).user?.id;
-            if (userId != null) {
-              await _learningService.completeQuiz(
-                  userId, _score, _questions.length);
-              widget.onQuizCompleted();
-            }
-          } catch (e) {
-            print('Error updating quiz progress: $e');
+        try {
+          final userId =
+              Provider.of<UserProvider>(context, listen: false).user?.id;
+          if (userId != null) {
+            // Selalu update point tanpa melihat skor minimum
+            await _learningService.completeQuiz(
+                userId, _score, _questions.length);
+            widget.onQuizCompleted();
           }
+        } catch (e) {
+          print('Error updating quiz progress: $e');
         }
 
         // Tampilkan dialog hasil

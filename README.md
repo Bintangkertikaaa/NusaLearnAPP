@@ -1,16 +1,34 @@
-# nusa_learn_app
+# NusaLearn
 
-A new Flutter project.
+NusaLearn adalah aplikasi pembelajaran interaktif yang dirancang untuk membantu siswa belajar dengan cara yang menyenangkan. Aplikasi ini menggabungkan elemen gamifikasi dengan materi pembelajaran yang komprehensif.
 
-## Getting Started
+## Fitur
 
-This project is a starting point for a Flutter application.
+- Sistem poin dan pencapaian
+- Kuis interaktif
+- Mini games edukatif
+- Forum diskusi
+- Chat antar pengguna
+- Sistem pertemanan
+- Progress tracking
 
-A few resources to get you started if this is your first Flutter project:
+## Teknologi
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+- Flutter
+- Firebase
+- Dart
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Instalasi
+
+1. Clone repository ini
+2. Jalankan `flutter pub get`
+3. Konfigurasi Firebase
+4. Jalankan aplikasi dengan `flutter run`
+
+## Kontribusi
+
+Silakan berkontribusi dengan membuat pull request atau melaporkan issues.
+
+## Lisensi
+
+MIT License

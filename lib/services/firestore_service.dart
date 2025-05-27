@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user_model.dart';
+import '../models/learning_progress.dart';
 
 class FirestoreService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -7,7 +8,20 @@ class FirestoreService {
   // Menambah user baru
   Future<void> addUser(UserModel user) async {
     try {
-      await _firestore.collection('users').doc(user.id).set(user.toFirestore());
+      // Use batch write for consistency
+      final batch = _firestore.batch();
+
+      // Add user data
+      final userRef = _firestore.collection('users').doc(user.id);
+      batch.set(userRef, user.toFirestore());
+
+      // Initialize learning progress
+      final progressRef =
+          _firestore.collection('learning_progress').doc(user.id);
+      final newProgress = LearningProgress(userId: user.id);
+      batch.set(progressRef, newProgress.toFirestore());
+
+      await batch.commit();
     } catch (e) {
       print('Error adding user: $e');
       rethrow;
@@ -46,7 +60,15 @@ class FirestoreService {
   // Menghapus user
   Future<void> deleteUser(String userId) async {
     try {
-      await _firestore.collection('users').doc(userId).delete();
+      final batch = _firestore.batch();
+
+      // Delete user data
+      batch.delete(_firestore.collection('users').doc(userId));
+
+      // Delete learning progress
+      batch.delete(_firestore.collection('learning_progress').doc(userId));
+
+      await batch.commit();
     } catch (e) {
       print('Error deleting user: $e');
       rethrow;

@@ -5,9 +5,11 @@ import 'profile_screen.dart';
 import 'material_screen.dart';
 import 'minigames_screen.dart';
 import 'achievement_screen.dart';
-import '../data/material_data.dart';  // Import material data
+import '../data/material_data.dart'; // Import material data
 
 class HomeScreen extends StatefulWidget {
+  const HomeScreen({Key? key}) : super(key: key);
+
   @override
   _HomeScreenState createState() => _HomeScreenState();
 }
@@ -16,7 +18,7 @@ class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
 
   final List<Widget> _screens = [
-    DashboardScreen(),
+    const DashboardScreen(),
     const ProfileScreen(),
     const FriendRequestsScreen(),
   ];
@@ -49,8 +51,10 @@ class _HomeScreenState extends State<HomeScreen> {
             unselectedItemColor: Colors.grey,
             onTap: (index) => setState(() => _currentIndex = index),
             items: const [
-              BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Dashboard'),
-              BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profil'),
+              BottomNavigationBarItem(
+                  icon: Icon(Icons.home), label: 'Dashboard'),
+              BottomNavigationBarItem(
+                  icon: Icon(Icons.person), label: 'Profil'),
               BottomNavigationBarItem(
                   icon: Icon(Icons.notifications), label: 'Kontak Masuk'),
             ],
@@ -64,6 +68,8 @@ class _HomeScreenState extends State<HomeScreen> {
 /* ---------------- Dashboard ---------------- */
 
 class DashboardScreen extends StatelessWidget {
+  const DashboardScreen({Key? key}) : super(key: key);
+
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
@@ -86,8 +92,6 @@ class DashboardScreen extends StatelessWidget {
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 20),
-
-          /* ---------- Menu Grid ---------- */
           GridView.count(
             crossAxisCount: 2,
             shrinkWrap: true,
@@ -96,7 +100,7 @@ class DashboardScreen extends StatelessWidget {
             crossAxisSpacing: 16,
             childAspectRatio: 1,
             children: [
-              buildMenuBox(context, 'Materi', Icons.menu_book, () {
+              _buildMenuBox(context, 'Materi', Icons.menu_book, () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -104,16 +108,29 @@ class DashboardScreen extends StatelessWidget {
                   ),
                 );
               }),
-              buildMenuBox(context, 'Mini Games', Icons.videogame_asset, () {
-                Navigator.pushNamed(context, '/minigames');
-              }),
-              buildMenuBox(context, 'Achievement', Icons.emoji_events, () {
-                Navigator.push(context,
-                    MaterialPageRoute(builder: (_) => AchievementScreen()));
-              }),
-              buildMenuBox(context, 'Sosial', Icons.group, () {
+              _buildMenuBox(context, 'Mini Games', Icons.videogame_asset, () {
                 Navigator.push(
-                    context, MaterialPageRoute(builder: (_) => SocialScreen()));
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const MinigamesScreen(),
+                  ),
+                );
+              }),
+              _buildMenuBox(context, 'Achievement', Icons.emoji_events, () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const AchievementScreen(),
+                  ),
+                );
+              }),
+              _buildMenuBox(context, 'Sosial', Icons.group, () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const SocialScreen(),
+                  ),
+                );
               }),
             ],
           ),
@@ -122,8 +139,7 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  /* ---------- Kotak Menu Reusable ---------- */
-  Widget buildMenuBox(
+  Widget _buildMenuBox(
       BuildContext context, String title, IconData icon, VoidCallback onTap) {
     return InkWell(
       onTap: onTap,
@@ -145,4 +161,4 @@ class DashboardScreen extends StatelessWidget {
       ),
     );
   }
-} 
+}

@@ -4,9 +4,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../providers/user_provider.dart';
 import '../models/user_model.dart';
+import '../models/learning_progress.dart';
 import 'home_screen.dart';
 import 'forgot_password_screen.dart';
 import 'register_screen.dart';
+import '../services/friend_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -16,149 +18,101 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final TextEditingController emailController = TextEditingController();
-  final TextEditingController passwordController = TextEditingController();
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final _formKey = GlobalKey<FormState>();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _auth = FirebaseAuth.instance;
+  final _firestore = FirebaseFirestore.instance;
 
   bool _isLoading = false;
-  String? _emailError;
-  String? _passwordError;
   bool _obscurePassword = true;
   bool _rememberMe = false;
 
-  Future<void> _validateAndLogin() async {
+  Future<void> _login() async {
+    if (!_formKey.currentState!.validate()) return;
+
     setState(() {
-      _emailError = null;
-      _passwordError = null;
       _isLoading = true;
     });
 
     try {
-      final email = emailController.text.trim();
-      final password = passwordController.text.trim();
-      bool hasError = false;
+      // Login dengan Firebase
+      final userCredential = await _auth.signInWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      );
 
-      if (email.isEmpty) {
-        setState(() {
-          _emailError = 'Email tidak boleh kosong';
-          hasError = true;
-        });
-      } else if (!email.contains('@')) {
-        setState(() {
-          _emailError = 'Email tidak valid';
-          hasError = true;
-        });
-      }
+      if (userCredential.user != null) {
+        // Get user data from Firestore
+        final userDoc = await _firestore
+            .collection('users')
+            .doc(userCredential.user!.uid)
+            .get();
 
-      if (password.isEmpty) {
-        setState(() {
-          _passwordError = 'Kata sandi tidak boleh kosong';
-          hasError = true;
-        });
-      } else if (password.length < 6) {
-        setState(() {
-          _passwordError = 'Kata sandi minimal 6 karakter';
-          hasError = true;
-        });
-      }
+        if (!mounted) return;
 
-      if (!hasError) {
-        // Login dengan Firebase
-        final userCredential = await _auth.signInWithEmailAndPassword(
-          email: email,
-          password: password,
-        );
+        if (userDoc.exists) {
+          final userData = userDoc.data()!;
+          // Create UserModel from Firestore data
+          final user =
+              UserModel.fromFirestore(userData, userCredential.user!.uid);
 
-        if (userCredential.user != null) {
-          // Ambil data user dari Firestore
-          final userDoc = await _firestore
-              .collection('users')
-              .doc(userCredential.user!.uid)
-              .get();
+          // Set user to provider
+          Provider.of<UserProvider>(context, listen: false).setUser(user);
 
-          if (userDoc.exists) {
-            final userData = userDoc.data()!;
-            // Buat UserModel dari data Firestore menggunakan factory method
-            final user =
-                UserModel.fromFirestore(userData, userCredential.user!.uid);
-
-            // Set user ke provider
-            if (!mounted) return;
-            Provider.of<UserProvider>(context, listen: false).setUser(user);
-
-            // Navigasi ke home screen
-            if (!mounted) return;
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => HomeScreen()),
-            );
-          } else {
-            // Jika data user tidak ditemukan di Firestore, buat data default
-            final defaultUser = UserModel(
-              id: userCredential.user!.uid,
-              name: userCredential.user!.displayName ?? '',
-              email: userCredential.user!.email ?? '',
-              school: '',
-              level: 'Pemula',
-              points: 0,
-              awards: 0,
-            );
-
-            // Simpan data default ke Firestore
-            await _firestore
-                .collection('users')
-                .doc(userCredential.user!.uid)
-                .set(defaultUser.toFirestore());
-
-            // Set user ke provider
-            if (!mounted) return;
-            Provider.of<UserProvider>(context, listen: false)
-                .setUser(defaultUser);
-
-            // Navigasi ke home screen
-            if (!mounted) return;
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => HomeScreen()),
-            );
-          }
+          // Navigate to home screen
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const HomeScreen()),
+          );
+        } else {
+          // Data user tidak ditemukan di Firestore
+          await _auth.signOut(); // Sign out karena data tidak lengkap
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                  'Data pengguna tidak ditemukan. Silakan daftar terlebih dahulu.'),
+              backgroundColor: Colors.red,
+            ),
+          );
         }
       }
-    } catch (e) {
-      String errorMessage = 'Terjadi kesalahan';
+    } on FirebaseAuthException catch (e) {
+      String message = 'Terjadi kesalahan saat login';
 
-      if (e is FirebaseAuthException) {
-        switch (e.code) {
-          case 'user-not-found':
-            errorMessage = 'Email tidak terdaftar';
-            break;
-          case 'wrong-password':
-            errorMessage = 'Kata sandi salah';
-            break;
-          case 'invalid-email':
-            errorMessage = 'Format email tidak valid';
-            break;
-          case 'user-disabled':
-            errorMessage = 'Akun telah dinonaktifkan';
-            break;
-          case 'network-request-failed':
-            errorMessage = 'Koneksi internet bermasalah';
-            break;
-          default:
-            errorMessage = 'Error: ${e.code} - ${e.message}';
-        }
-      } else {
-        errorMessage = 'Error: ${e.toString()}';
+      switch (e.code) {
+        case 'user-not-found':
+          message = 'Email tidak terdaftar. Silakan daftar terlebih dahulu.';
+          break;
+        case 'wrong-password':
+          message = 'Kata sandi salah';
+          break;
+        case 'invalid-email':
+          message = 'Format email tidak valid';
+          break;
+        case 'user-disabled':
+          message = 'Akun telah dinonaktifkan';
+          break;
+        case 'network-request-failed':
+          message = 'Koneksi internet bermasalah';
+          break;
+        default:
+          message = e.message ?? 'Terjadi kesalahan';
       }
 
-      print('Login error: $errorMessage'); // Tambahkan log untuk debugging
-
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(errorMessage),
+          content: Text(message),
           backgroundColor: Colors.red,
-          duration: const Duration(seconds: 5),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: Colors.red,
         ),
       );
     } finally {
@@ -176,119 +130,117 @@ class _LoginScreenState extends State<LoginScreen> {
       backgroundColor: const Color(0xFFFFF3E0),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Center(
-              child: Image.asset('assets/images/nusa_learn.png', height: 120),
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              'Selamat Datang!',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Masuk untuk melanjutkan petualanganmu',
-              style: TextStyle(fontSize: 16, color: Colors.black54),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 32),
-
-            // Form
-            const Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Email',
-                style: TextStyle(fontWeight: FontWeight.bold),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Image.asset('assets/images/nusa_learn.png', height: 120),
               ),
-            ),
-            const SizedBox(height: 6),
-            TextField(
-              controller: emailController,
-              keyboardType: TextInputType.emailAddress,
-              decoration: InputDecoration(
-                hintText: 'Masukkan email',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: Colors.orange),
-                ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                errorText: _emailError,
+              const SizedBox(height: 20),
+              const Text(
+                'Selamat Datang!',
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
               ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Kata Sandi',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+              const SizedBox(height: 8),
+              const Text(
+                'Masuk untuk melanjutkan petualanganmu',
+                style: TextStyle(fontSize: 16, color: Colors.black54),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 32),
+              TextFormField(
+                controller: _emailController,
+                keyboardType: TextInputType.emailAddress,
+                decoration: const InputDecoration(
+                  labelText: 'Email',
+                  border: OutlineInputBorder(),
                 ),
-                TextButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) => ForgotPasswordScreen()),
-                    );
-                  },
-                  child: const Text(
-                    'Lupa kata sandi?',
-                    style: TextStyle(color: Colors.orange),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Email tidak boleh kosong';
+                  }
+                  if (!value.contains('@')) {
+                    return 'Email tidak valid';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _passwordController,
+                obscureText: _obscurePassword,
+                decoration: InputDecoration(
+                  labelText: 'Password',
+                  border: const OutlineInputBorder(),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscurePassword
+                          ? Icons.visibility_off
+                          : Icons.visibility,
+                      color: Colors.grey,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _obscurePassword = !_obscurePassword;
+                      });
+                    },
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            TextField(
-              controller: passwordController,
-              obscureText: _obscurePassword,
-              decoration: InputDecoration(
-                hintText: 'Masukkan kata sandi',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                errorText: _passwordError,
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                    color: Colors.grey,
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      _obscurePassword = !_obscurePassword;
-                    });
-                  },
-                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Password tidak boleh kosong';
+                  }
+                  if (value.length < 6) {
+                    return 'Password minimal 6 karakter';
+                  }
+                  return null;
+                },
               ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Checkbox(
-                  value: _rememberMe,
-                  onChanged: (value) {
-                    setState(() {
-                      _rememberMe = value ?? false;
-                    });
-                  },
-                  activeColor: Colors.orange,
-                ),
-                const Text('Ingat saya'),
-              ],
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _isLoading ? null : _validateAndLogin,
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Checkbox(
+                        value: _rememberMe,
+                        onChanged: (value) {
+                          setState(() {
+                            _rememberMe = value ?? false;
+                          });
+                        },
+                        activeColor: const Color(0xFFFF6D3D),
+                      ),
+                      const Text('Ingat saya'),
+                    ],
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ForgotPasswordScreen(),
+                        ),
+                      );
+                    },
+                    child: const Text(
+                      'Lupa password?',
+                      style: TextStyle(color: Color(0xFFFF6D3D)),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: _isLoading ? null : _login,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFFF6D3D),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(8),
                   ),
                 ),
                 child: _isLoading
@@ -309,32 +261,41 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
               ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text('Belum punya akun? '),
-                TextButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => RegisterScreen()),
-                    );
-                  },
-                  child: const Text(
-                    'Daftar',
-                    style: TextStyle(
-                      color: Color(0xFFFF6D3D),
-                      fontWeight: FontWeight.bold,
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text('Belum punya akun?'),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const RegisterScreen(),
+                        ),
+                      );
+                    },
+                    child: const Text(
+                      'Daftar',
+                      style: TextStyle(
+                        color: Color(0xFFFF6D3D),
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ),
-          ],
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
   }
 }

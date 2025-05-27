@@ -4,14 +4,16 @@ import '../models/learning_progress.dart';
 class LearningService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // Mendapatkan progress pembelajaran user
+  // Get user's learning progress
   Future<LearningProgress> getLearningProgress(String userId) async {
     final doc =
         await _firestore.collection('learning_progress').doc(userId).get();
+
     if (doc.exists) {
-      return LearningProgress.fromFirestore(doc.data()!);
+      return LearningProgress.fromFirestore(doc.data()!, userId);
     }
-    // Jika dokumen belum ada, buat baru
+
+    // If document doesn't exist, create new
     final newProgress = LearningProgress(userId: userId);
     await _firestore
         .collection('learning_progress')
@@ -20,92 +22,150 @@ class LearningService {
     return newProgress;
   }
 
-  // Update progress setelah membaca materi
+  // Update progress after reading material
   Future<void> completeReading(String userId, int pointsEarned) async {
-    final progress = await getLearningProgress(userId);
-    final updatedProgress = progress.addPoints(pointsEarned);
+    // Base points for completing reading
+    final basePoints = 5;
+    // Bonus points for engagement (pointsEarned parameter) - max 5 points
+    final bonusPoints = pointsEarned > 5 ? 5 : pointsEarned;
+    final totalPoints = basePoints + bonusPoints;
 
-    await _firestore.collection('learning_progress').doc(userId).set({
-      'userId': userId,
-      'readingCompleted': FieldValue.increment(1),
-      'totalPoints': updatedProgress.totalPoints,
-      'currentLevel': updatedProgress.currentLevel,
-      'quizCompleted': progress.quizCompleted,
-      'gamesCompleted': progress.gamesCompleted,
-      'achievements': progress.achievements,
-    }, SetOptions(merge: true));
+    final doc =
+        await _firestore.collection('learning_progress').doc(userId).get();
+    final progress = LearningProgress.fromFirestore(doc.data()!, userId);
 
-    // Update user level di collection users
-    await _firestore.collection('users').doc(userId).update({
+    final updatedProgress = progress.addPoints(totalPoints).copyWith(
+          readingCompleted: progress.readingCompleted + 1,
+        );
+
+    // Use batch write for consistency
+    final batch = _firestore.batch();
+
+    // Update learning progress
+    final progressRef = _firestore.collection('learning_progress').doc(userId);
+    batch.set(progressRef, updatedProgress.toFirestore());
+
+    // Update user points and level
+    final userRef = _firestore.collection('users').doc(userId);
+    batch.update(userRef, {
+      'points': FieldValue.increment(totalPoints),
       'level': updatedProgress.currentLevel,
-      'points': updatedProgress.totalPoints,
     });
+
+    await batch.commit();
   }
 
-  // Update progress setelah menyelesaikan kuis
+  // Update progress after completing quiz
   Future<void> completeQuiz(String userId, int score, int maxScore) async {
-    final pointsEarned =
-        (score / maxScore * 100).round(); // Konversi skor ke poin
-    final progress = await getLearningProgress(userId);
-    final updatedProgress = progress.addPoints(pointsEarned);
+    // Base points: 5 points per correct answer
+    final pointsPerQuestion = 5;
+    final basePoints =
+        (score * pointsPerQuestion); // if score is number of correct answers
 
-    await _firestore.collection('learning_progress').doc(userId).set({
-      'userId': userId,
-      'quizCompleted': FieldValue.increment(1),
-      'totalPoints': updatedProgress.totalPoints,
-      'currentLevel': updatedProgress.currentLevel,
-      'readingCompleted': progress.readingCompleted,
-      'gamesCompleted': progress.gamesCompleted,
-      'achievements': progress.achievements,
-    }, SetOptions(merge: true));
+    // Bonus points for high performance
+    int bonusPoints = 0;
+    if (score == maxScore) {
+      bonusPoints = 10; // Perfect score bonus
+    } else if ((score / maxScore) >= 0.8) {
+      bonusPoints = 5; // High score bonus (80% or better)
+    }
 
-    // Update user level di collection users
-    await _firestore.collection('users').doc(userId).update({
+    final totalPoints = basePoints + bonusPoints;
+
+    final doc =
+        await _firestore.collection('learning_progress').doc(userId).get();
+    final progress = LearningProgress.fromFirestore(doc.data()!, userId);
+
+    final updatedProgress = progress.addPoints(totalPoints).copyWith(
+          quizCompleted: progress.quizCompleted + 1,
+        );
+
+    // Use batch write for consistency
+    final batch = _firestore.batch();
+
+    // Update learning progress
+    final progressRef = _firestore.collection('learning_progress').doc(userId);
+    batch.set(progressRef, updatedProgress.toFirestore());
+
+    // Update user points and level
+    final userRef = _firestore.collection('users').doc(userId);
+    batch.update(userRef, {
+      'points': FieldValue.increment(totalPoints),
       'level': updatedProgress.currentLevel,
-      'points': updatedProgress.totalPoints,
     });
+
+    await batch.commit();
   }
 
-  // Update progress setelah menyelesaikan game
+  // Update progress after completing game
   Future<void> completeGame(String userId, int score) async {
-    final progress = await getLearningProgress(userId);
-    final updatedProgress = progress.addPoints(score);
+    // Points for completing a game level (50 points per level)
+    final levelPoints = 50;
 
-    await _firestore.collection('learning_progress').doc(userId).set({
-      'userId': userId,
-      'gamesCompleted': FieldValue.increment(1),
-      'totalPoints': updatedProgress.totalPoints,
-      'currentLevel': updatedProgress.currentLevel,
-      'readingCompleted': progress.readingCompleted,
-      'quizCompleted': progress.quizCompleted,
-      'achievements': progress.achievements,
-    }, SetOptions(merge: true));
+    // Bonus points for high score in the level (up to 10 additional points)
+    final bonusPoints = (score >= 90)
+        ? 10
+        : (score >= 75)
+            ? 5
+            : (score >= 60)
+                ? 3
+                : 0;
 
-    // Update user level di collection users
-    await _firestore.collection('users').doc(userId).update({
+    final totalPoints = levelPoints + bonusPoints;
+
+    final doc =
+        await _firestore.collection('learning_progress').doc(userId).get();
+    final progress = LearningProgress.fromFirestore(doc.data()!, userId);
+
+    final updatedProgress = progress.addPoints(totalPoints).copyWith(
+          gamesCompleted: progress.gamesCompleted + 1,
+        );
+
+    // Use batch write for consistency
+    final batch = _firestore.batch();
+
+    // Update learning progress
+    final progressRef = _firestore.collection('learning_progress').doc(userId);
+    batch.set(progressRef, updatedProgress.toFirestore());
+
+    // Update user points and level
+    final userRef = _firestore.collection('users').doc(userId);
+    batch.update(userRef, {
+      'points': FieldValue.increment(totalPoints),
       'level': updatedProgress.currentLevel,
-      'points': updatedProgress.totalPoints,
     });
+
+    await batch.commit();
   }
 
-  // Menambah pencapaian baru
+  // Add new achievement
   Future<void> addAchievement(String userId, String achievement) async {
-    final progress = await getLearningProgress(userId);
-    final updatedProgress = progress.addAchievement(achievement);
+    // Points earned for getting a new achievement
+    final achievementPoints = 25;
 
-    await _firestore.collection('learning_progress').doc(userId).set({
-      'userId': userId,
-      'achievements': updatedProgress.achievements,
-      'readingCompleted': progress.readingCompleted,
-      'quizCompleted': progress.quizCompleted,
-      'gamesCompleted': progress.gamesCompleted,
-      'totalPoints': progress.totalPoints,
-      'currentLevel': progress.currentLevel,
-    }, SetOptions(merge: true));
+    final doc =
+        await _firestore.collection('learning_progress').doc(userId).get();
+    final progress = LearningProgress.fromFirestore(doc.data()!, userId);
 
-    // Update awards count di collection users
-    await _firestore.collection('users').doc(userId).update({
+    // Add achievement and points
+    final updatedProgress =
+        progress.addAchievement(achievement).addPoints(achievementPoints);
+
+    // Use batch write for consistency
+    final batch = _firestore.batch();
+
+    // Update learning progress
+    final progressRef = _firestore.collection('learning_progress').doc(userId);
+    batch.set(progressRef, updatedProgress.toFirestore());
+
+    // Update user points, level, and awards
+    final userRef = _firestore.collection('users').doc(userId);
+    batch.update(userRef, {
+      'points': FieldValue.increment(achievementPoints),
+      'level': updatedProgress.currentLevel,
       'awards': updatedProgress.achievements.length,
     });
+
+    await batch.commit();
   }
 }

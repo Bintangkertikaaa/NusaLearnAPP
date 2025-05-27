@@ -7,191 +7,131 @@ import 'package:provider/provider.dart';
 import '../providers/user_provider.dart';
 import '../models/user_model.dart';
 import '../models/learning_progress.dart';
+import '../services/friend_service.dart';
 
 class RegisterScreen extends StatefulWidget {
+  const RegisterScreen({Key? key}) : super(key: key);
+
   @override
   _RegisterScreenState createState() => _RegisterScreenState();
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
-  final TextEditingController nameController = TextEditingController();
-  final TextEditingController emailController = TextEditingController();
-  final TextEditingController schoolController = TextEditingController();
-  final TextEditingController passwordController = TextEditingController();
-  final TextEditingController confirmPasswordController =
-      TextEditingController();
-
-  String? _nameError;
-  String? _emailError;
-  String? _schoolError;
-  String? _passwordError;
-  String? _confirmPasswordError;
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+  final _schoolController = TextEditingController();
   bool _isLoading = false;
+  late FirebaseFirestore _firestore;
 
-  bool _validateFields() {
-    bool isValid = true;
-
-    // Reset all error messages
-    setState(() {
-      _nameError = null;
-      _emailError = null;
-      _schoolError = null;
-      _passwordError = null;
-      _confirmPasswordError = null;
-    });
-
-    // Validate name
-    if (nameController.text.trim().isEmpty) {
-      setState(() {
-        _nameError = 'Nama lengkap tidak boleh kosong';
-        isValid = false;
-      });
-    }
-
-    // Validate email
-    String email = emailController.text.trim();
-    if (email.isEmpty) {
-      setState(() {
-        _emailError = 'Email tidak boleh kosong';
-        isValid = false;
-      });
-    } else if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email)) {
-      setState(() {
-        _emailError = 'Format email tidak valid';
-        isValid = false;
-      });
-    }
-
-    // Validate school
-    if (schoolController.text.trim().isEmpty) {
-      setState(() {
-        _schoolError = 'Nama sekolah tidak boleh kosong';
-        isValid = false;
-      });
-    }
-
-    // Validate password
-    String password = passwordController.text;
-    if (password.isEmpty) {
-      setState(() {
-        _passwordError = 'Kata sandi tidak boleh kosong';
-        isValid = false;
-      });
-    } else if (password.length < 6) {
-      setState(() {
-        _passwordError = 'Kata sandi minimal 6 karakter';
-        isValid = false;
-      });
-    }
-
-    // Validate confirm password
-    String confirmPassword = confirmPasswordController.text;
-    if (confirmPassword.isEmpty) {
-      setState(() {
-        _confirmPasswordError = 'Konfirmasi kata sandi tidak boleh kosong';
-        isValid = false;
-      });
-    } else if (confirmPassword != password) {
-      setState(() {
-        _confirmPasswordError = 'Konfirmasi kata sandi tidak cocok';
-        isValid = false;
-      });
-    }
-
-    return isValid;
+  @override
+  void initState() {
+    super.initState();
+    _firestore = FirebaseFirestore.instance;
   }
 
-  void _handleRegister() async {
-    if (_validateFields()) {
-      setState(() {
-        _isLoading = true;
-      });
+  Future<void> _register() async {
+    if (!_formKey.currentState!.validate()) return;
 
-      try {
-        // Create user in Firebase Auth
-        final userCredential =
-            await FirebaseAuth.instance.createUserWithEmailAndPassword(
-          email: emailController.text.trim(),
-          password: passwordController.text,
+    if (_passwordController.text != _confirmPasswordController.text) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Kata sandi tidak cocok'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final userCredential =
+          await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      );
+
+      if (userCredential.user != null) {
+        final newUser = UserModel(
+          id: userCredential.user!.uid,
+          name: _nameController.text.trim(),
+          email: _emailController.text.trim(),
+          school: _schoolController.text.trim(),
         );
 
-        if (userCredential.user != null) {
-          // Create UserModel
-          final newUser = UserModel(
-            id: userCredential.user!.uid,
-            name: nameController.text.trim(),
-            email: emailController.text.trim(),
-            school: schoolController.text.trim(),
-            level: 'Pemula',
-            points: 0,
-            awards: 0,
-          );
+        final initialProgress = LearningProgress(
+          userId: userCredential.user!.uid,
+          totalPoints: 0,
+          readingCompleted: 0,
+          quizCompleted: 0,
+          gamesCompleted: 0,
+          achievements: [],
+        );
 
-          // Save user data to Firestore
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(userCredential.user!.uid)
-              .set(newUser.toFirestore());
+        final batch = _firestore.batch();
+        final userRef =
+            _firestore.collection('users').doc(userCredential.user!.uid);
+        final progressRef = _firestore
+            .collection('learning_progress')
+            .doc(userCredential.user!.uid);
 
-          // Create initial learning progress
-          final initialProgress = LearningProgress(
-            userId: userCredential.user!.uid,
-          );
+        batch.set(userRef, newUser.toFirestore());
+        batch.set(progressRef, initialProgress.toFirestore());
+        await batch.commit();
 
-          // Save learning progress to Firestore
-          await FirebaseFirestore.instance
-              .collection('learning_progress')
-              .doc(userCredential.user!.uid)
-              .set(initialProgress.toFirestore());
+        // Initialize default friends
+        await FriendService().initializeDefaultFriends(
+            userCredential.user!.uid, userCredential.user!.email ?? '');
 
-          if (!mounted) return;
-
-          // Show success message
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Pendaftaran berhasil! Silakan masuk.'),
-              backgroundColor: Colors.green,
-            ),
-          );
-
-          // Navigate back to login screen
-          Navigator.pop(context);
-        }
-      } catch (e) {
-        String errorMessage = 'Terjadi kesalahan saat mendaftar';
-
-        if (e is FirebaseAuthException) {
-          switch (e.code) {
-            case 'email-already-in-use':
-              errorMessage = 'Email sudah terdaftar';
-              break;
-            case 'invalid-email':
-              errorMessage = 'Format email tidak valid';
-              break;
-            case 'operation-not-allowed':
-              errorMessage =
-                  'Pendaftaran dengan email dan password tidak diizinkan';
-              break;
-            case 'weak-password':
-              errorMessage = 'Password terlalu lemah';
-              break;
-            default:
-              errorMessage = 'Error: ${e.message}';
-          }
-        }
+        if (!mounted) return;
 
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
-            backgroundColor: Colors.red,
+          const SnackBar(
+            content: Text('Pendaftaran berhasil! Silakan masuk.'),
+            backgroundColor: Colors.green,
           ),
         );
-      } finally {
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-          });
-        }
+
+        Navigator.pop(context);
+      }
+    } on FirebaseAuthException catch (e) {
+      String message = 'Terjadi kesalahan saat mendaftar';
+
+      switch (e.code) {
+        case 'email-already-in-use':
+          message = 'Email sudah terdaftar';
+          break;
+        case 'invalid-email':
+          message = 'Format email tidak valid';
+          break;
+        case 'weak-password':
+          message = 'Password terlalu lemah';
+          break;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
       }
     }
   }
@@ -199,173 +139,194 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFFF3E0),
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          'Daftar Akun',
+          style: TextStyle(color: Colors.black),
+        ),
+      ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header dengan tombol kembali
-            Row(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20.0),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                IconButton(
-                  icon: const Icon(Icons.arrow_back),
-                  onPressed: () => Navigator.pop(context),
-                ),
                 const Text(
-                  'Daftar Akun',
+                  'Nama Lengkap',
                   style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    color: Colors.black87,
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 32),
-
-            // Form Pendaftaran
-            const Text(
-              'Nama Lengkap',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 6),
-            TextField(
-              controller: nameController,
-              decoration: InputDecoration(
-                hintText: 'Masukkan nama lengkap',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: Colors.orange),
+                TextFormField(
+                  controller: _nameController,
+                  decoration: const InputDecoration(
+                    hintText: 'Masukkan nama lengkap',
+                    hintStyle: TextStyle(color: Colors.grey),
+                    border: UnderlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Nama tidak boleh kosong';
+                    }
+                    return null;
+                  },
                 ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                errorText: _nameError,
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            const Text(
-              'Email',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 6),
-            TextField(
-              controller: emailController,
-              keyboardType: TextInputType.emailAddress,
-              decoration: InputDecoration(
-                hintText: 'Masukkan email',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                errorText: _emailError,
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            const Text(
-              'Sekolah',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 6),
-            TextField(
-              controller: schoolController,
-              decoration: InputDecoration(
-                hintText: 'Masukkan nama sekolah',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                errorText: _schoolError,
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            const Text(
-              'Kata Sandi',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 6),
-            TextField(
-              controller: passwordController,
-              obscureText: true,
-              decoration: InputDecoration(
-                hintText: 'Masukkan kata sandi',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                errorText: _passwordError,
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            const Text(
-              'Konfirmasi Kata Sandi',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 6),
-            TextField(
-              controller: confirmPasswordController,
-              obscureText: true,
-              decoration: InputDecoration(
-                hintText: 'Masukkan ulang kata sandi',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                errorText: _confirmPasswordError,
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // Tombol Daftar
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _isLoading ? null : _handleRegister,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFFF6D3D),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
+                const SizedBox(height: 16),
+                const Text(
+                  'Email',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.black87,
                   ),
                 ),
-                child: _isLoading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor:
-                              AlwaysStoppedAnimation<Color>(Colors.white),
-                        ),
-                      )
-                    : const Text(
-                        'Daftar',
+                TextFormField(
+                  controller: _emailController,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: const InputDecoration(
+                    hintText: 'Masukkan email',
+                    hintStyle: TextStyle(color: Colors.grey),
+                    border: UnderlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Email tidak boleh kosong';
+                    }
+                    if (!value.contains('@')) {
+                      return 'Email tidak valid';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Sekolah',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.black87,
+                  ),
+                ),
+                TextFormField(
+                  controller: _schoolController,
+                  decoration: const InputDecoration(
+                    hintText: 'Masukkan nama sekolah',
+                    hintStyle: TextStyle(color: Colors.grey),
+                    border: UnderlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Nama sekolah tidak boleh kosong';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Kata Sandi',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.black87,
+                  ),
+                ),
+                TextFormField(
+                  controller: _passwordController,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    hintText: 'Masukkan kata sandi',
+                    hintStyle: TextStyle(color: Colors.grey),
+                    border: UnderlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Kata sandi tidak boleh kosong';
+                    }
+                    if (value.length < 6) {
+                      return 'Kata sandi minimal 6 karakter';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Konfirmasi Kata Sandi',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.black87,
+                  ),
+                ),
+                TextFormField(
+                  controller: _confirmPasswordController,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    hintText: 'Masukkan ulang kata sandi',
+                    hintStyle: TextStyle(color: Colors.grey),
+                    border: UnderlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Konfirmasi kata sandi tidak boleh kosong';
+                    }
+                    if (value != _passwordController.text) {
+                      return 'Kata sandi tidak cocok';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _register,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFFF6D3D),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: _isLoading
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : const Text(
+                            'Daftar',
+                            style: TextStyle(fontSize: 16),
+                          ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text('Sudah punya akun?'),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text(
+                        'Masuk di sini',
                         style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
+                          color: Color(0xFFFF6D3D),
                         ),
                       ),
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // Link ke Login
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text('Sudah punya akun?'),
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text(
-                    'Masuk di sini',
-                    style: TextStyle(color: Colors.deepOrange),
-                  ),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -373,11 +334,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   void dispose() {
-    nameController.dispose();
-    emailController.dispose();
-    schoolController.dispose();
-    passwordController.dispose();
-    confirmPasswordController.dispose();
+    _nameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    _schoolController.dispose();
     super.dispose();
   }
 }

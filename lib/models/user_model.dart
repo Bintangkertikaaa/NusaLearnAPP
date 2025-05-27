@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class UserModel {
   final String id;
   final String name;
@@ -6,16 +8,18 @@ class UserModel {
   final String level;
   final int points;
   final int awards;
+  final List<String> friends;
 
   UserModel({
     required this.id,
     required this.name,
     required this.email,
     required this.school,
-    required this.level,
+    this.level = 'Pemula',
     this.points = 0,
     this.awards = 0,
-  });
+    List<String>? friends,
+  }) : friends = friends ?? [];
 
   // Mengubah data dari Firestore menjadi UserModel
   factory UserModel.fromFirestore(Map<String, dynamic> data, String id) {
@@ -25,12 +29,13 @@ class UserModel {
       email: data['email'] ?? '',
       school: data['school'] ?? '',
       level: data['level'] ?? 'Pemula',
-      points: data['points']?.toInt() ?? 0,
-      awards: data['awards']?.toInt() ?? 0,
+      points: (data['points'] ?? 0).toInt(),
+      awards: (data['awards'] ?? 0).toInt(),
+      friends: List<String>.from(data['friends'] ?? []),
     );
   }
 
-  // Mengubah UserModel menjadi format yang bisa disimpan di Firestore
+  // Mengubah UserModel menjadi data untuk Firestore
   Map<String, dynamic> toFirestore() {
     return {
       'name': name,
@@ -39,10 +44,11 @@ class UserModel {
       'level': level,
       'points': points,
       'awards': awards,
+      'friends': friends,
     };
   }
 
-  // Method untuk membuat salinan objek dengan nilai yang diperbarui
+  // Membuat salinan UserModel dengan nilai yang diperbarui
   UserModel copyWith({
     String? id,
     String? name,
@@ -51,6 +57,7 @@ class UserModel {
     String? level,
     int? points,
     int? awards,
+    List<String>? friends,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -60,6 +67,7 @@ class UserModel {
       level: level ?? this.level,
       points: points ?? this.points,
       awards: awards ?? this.awards,
+      friends: friends ?? List<String>.from(this.friends),
     );
   }
 }

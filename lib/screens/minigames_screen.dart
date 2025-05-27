@@ -38,23 +38,19 @@ class _MinigamesScreenState extends State<MinigamesScreen> {
       _levelScores[category] = {};
     }
 
-    // Only update if new score is higher
-    final currentScore = _levelScores[category]?[level] ?? 0;
-    if (score > currentScore) {
-      setState(() {
-        _levelScores[category]![level] = score;
-      });
+    // Always update score and give points
+    setState(() {
+      _levelScores[category]![level] = score;
+    });
 
-      // Update learning progress
-      try {
-        final userId =
-            Provider.of<UserProvider>(context, listen: false).user?.id;
-        if (userId != null) {
-          await _learningService.completeGame(userId, score);
-        }
-      } catch (e) {
-        print('Error updating game progress: $e');
+    // Update learning progress
+    try {
+      final userId = Provider.of<UserProvider>(context, listen: false).user?.id;
+      if (userId != null) {
+        await _learningService.completeGame(userId, score);
       }
+    } catch (e) {
+      print('Error updating game progress: $e');
     }
   }
 
