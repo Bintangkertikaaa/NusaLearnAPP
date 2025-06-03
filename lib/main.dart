@@ -20,7 +20,6 @@ void main() async {
   );
 
   // Mengatur pengaturan Firestore
-  await FirebaseFirestore.instance.enablePersistence();
   FirebaseFirestore.instance.settings = const Settings(
     persistenceEnabled: true, // Mengaktifkan caching lokal
     cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED, // Cache tidak terbatas

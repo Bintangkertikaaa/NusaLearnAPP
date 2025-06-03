@@ -1,0 +1,25 @@
+DAFTAR PERBAIKAN AGAR APLIKASI FLUTTER BISA BERJALAN DI ANDROID
+
+1. Migrasi Gradle Plugin Flutter
+   - Mengganti integrasi Flutter di android/app/build.gradle dari 'apply from:' ke 'plugins { ... }' sesuai aturan Flutter terbaru.
+
+2. Menghapus Baris apply plugin
+   - Menghapus baris 'apply plugin: ...' yang sudah tidak diperlukan setelah migrasi ke 'plugins { ... }'.
+
+3. Update Versi Kotlin
+   - Mengubah versi Kotlin di android/build.gradle dari 1.7.10 ke 1.8.22 agar kompatibel dengan Flutter dan plugin terbaru.
+
+4. Update NDK Version
+   - Menambahkan baris ndkVersion "27.0.12077973" di blok android { ... } pada android/app/build.gradle agar sesuai kebutuhan plugin Firebase.
+
+5. Memindahkan File google-services.json
+   - Memastikan file google-services.json berada di folder android/app/ (bukan hanya di android/).
+
+6. Memperbaiki Struktur dan Package MainActivity
+   - Memindahkan file MainActivity.kt ke path yang benar: android/app/src/main/kotlin/com/example/nusa_learn/MainActivity.kt
+   - Mengubah deklarasi package di file tersebut menjadi package com.example.nusa_learn.
+   - Menghapus file lama di package yang salah (nusa_learn_app).
+
+7. Menghapus Pemanggilan Firestore Persistence yang Tidak Didukung Android
+   - Menghapus baris 'await FirebaseFirestore.instance.enablePersistence();' di lib/main.dart karena hanya didukung di Web.
+   - Menyisakan pengaturan persistence dengan FirebaseFirestore.instance.settings = ...
