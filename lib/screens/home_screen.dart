@@ -3,9 +3,7 @@ import 'friend_requests_screen.dart';
 import 'social_screen.dart';
 import 'profile_screen.dart';
 import 'material_screen.dart';
-import 'minigames_screen.dart';
 import 'achievement_screen.dart';
-import '../data/material_data.dart'; // Import material data
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -26,7 +24,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return WillPopScope(
-      onWillPop: () async => false, // Prevent back button
+      onWillPop: () async => false,
       child: Scaffold(
         body: IndexedStack(
           index: _currentIndex,
@@ -51,12 +49,9 @@ class _HomeScreenState extends State<HomeScreen> {
             unselectedItemColor: Colors.grey,
             onTap: (index) => setState(() => _currentIndex = index),
             items: const [
-              BottomNavigationBarItem(
-                  icon: Icon(Icons.home), label: 'Dashboard'),
-              BottomNavigationBarItem(
-                  icon: Icon(Icons.person), label: 'Profil'),
-              BottomNavigationBarItem(
-                  icon: Icon(Icons.notifications), label: 'Kontak Masuk'),
+              BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Dashboard'),
+              BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profil'),
+              BottomNavigationBarItem(icon: Icon(Icons.notifications), label: 'Kontak Masuk'),
             ],
           ),
         ),
@@ -72,74 +67,92 @@ class DashboardScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: Image.asset(
-              'assets/images/banner_nusantara.png',
-              height: 160,
-              width: double.infinity,
-              fit: BoxFit.cover,
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.deepOrange,
+        elevation: 4,
+        automaticallyImplyLeading: false,
+        title: Row(
+          children: [
+            Image.asset(
+              'assets/images/nusa_learn2.png',
+              height: 32,
             ),
-          ),
-          const SizedBox(height: 12),
-          const Text(
-            'Menjelajahi Kekayaan Budaya Nusantara',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 20),
-          GridView.count(
-            crossAxisCount: 2,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: 16,
-            crossAxisSpacing: 16,
-            childAspectRatio: 1,
-            children: [
-              _buildMenuBox(context, 'Materi', Icons.menu_book, () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const MaterialCategoryScreen(),
-                  ),
-                );
-              }),
-              _buildMenuBox(context, 'Mini Games', Icons.videogame_asset, () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const MinigamesScreen(),
-                  ),
-                );
-              }),
-              _buildMenuBox(context, 'Achievement', Icons.emoji_events, () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const AchievementScreen(),
-                  ),
-                );
-              }),
-              _buildMenuBox(context, 'Sosial', Icons.group, () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const SocialScreen(),
-                  ),
-                );
-              }),
-            ],
-          ),
-        ],
+            const SizedBox(width: 10),
+            const Text(
+              'NusaLearn',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.asset(
+                'assets/images/banner_nusantara.png',
+                height: 160,
+                width: double.infinity,
+                fit: BoxFit.cover,
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Menjelajahi Kekayaan Budaya Nusantara',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 20),
+
+            /* ---------- Menu Grid ---------- */
+            GridView.count(
+              crossAxisCount: 2,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              mainAxisSpacing: 16,
+              crossAxisSpacing: 16,
+              childAspectRatio: 1,
+              children: [
+                buildMenuBox(context, 'Materi', Icons.menu_book, () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const MaterialCategoryScreen(),
+                    ),
+                  );
+                }),
+                buildMenuBox(context, 'Mini Games', Icons.videogame_asset, () {
+                  Navigator.pushNamed(context, '/minigames');
+                }),
+                buildMenuBox(context, 'Achievement', Icons.emoji_events, () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const AchievementScreen(),
+                    ),
+                  );
+                }),
+                buildMenuBox(context, 'Sosial', Icons.group, () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const SocialScreen(),
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildMenuBox(
+  /* ---------- Kotak Menu Reusable ---------- */
+  Widget buildMenuBox(
       BuildContext context, String title, IconData icon, VoidCallback onTap) {
     return InkWell(
       onTap: onTap,
@@ -162,3 +175,4 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 }
+
