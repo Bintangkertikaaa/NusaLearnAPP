@@ -34,7 +34,8 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/icons/
+    - assets/images/nusa_learn2.png
+    - assets/images/banner_nusantara.png
     - assets/images/
     - assets/fonts/
 
