@@ -79,10 +79,6 @@ class DashboardScreen extends StatelessWidget {
               height: 32,
             ),
             const SizedBox(width: 10),
-            const Text(
-              'NusaLearn',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
           ],
         ),
       ),
